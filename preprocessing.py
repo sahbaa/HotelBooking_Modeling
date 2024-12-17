@@ -135,13 +135,13 @@ def checkLogicalVal(data):
     for feature,items in zip(in_data.select_dtypes(include=['category','object']).columns,[val for val in logical_val.values() if feature in in_data.select_dtypes(include=['category','object']).columns]):
         in_data[feature] = in_data[feature].apply(lambda x : x if x in items else None)
    
-
+    in_data = in_data.set_index('id')
     return in_data
 
 
 
 def outlier_detection(data,target , catcol,contcol):
-    data = data.set_index('id')
+    
     in_data = data.copy()
     #onehotencoding and scaling 
     # all cats are nominal 
@@ -249,12 +249,14 @@ def discritizer (data,test , contcol):
     # tmp_sclr = scaler.fit_transform(in_data[contcol])
     # in_data[contcol] = pd.DataFrame(tmp_sclr,columns=contcol)
     # print(in_data[contcol].isna().sum())
-
+    catcol = [i for i in data.columns if i not in contcol]
     disc = KBinsDiscretizer(n_bins=5,strategy='kmeans',encode='ordinal')
     temp_disc = disc.fit_transform(in_data[contcol])
     in_data[contcol] = pd.DataFrame(temp_disc,columns=disc.get_feature_names_out())
     in_data[contcol] = in_data[contcol].astype('str')
+    in_data[catcol] = in_data[catcol].astype('str')
     test[contcol] = test[contcol].astype('str')
+    test[catcol] = test[catcol].astype('str')
     # for col in contcol : 
     #     print(frequntyTbl(data[col]))
 
@@ -278,15 +280,17 @@ def feature_selection(data,target):
     res1 = pd.DataFrame({'name':cat_cat.get_feature_names_out(),'scores':cat_cat.scores_})
     # res2 = pd.DataFrame({'name':ig_cat.get_feature_names_out(),'scores':ig_cat.scores_})
     print(res1.shape)
-    return list(res1.sort_values(by='scores',ascending=False).iloc[:10,0])
+    return list(res1.sort_values(by='scores',ascending=False).iloc[:18,0])
 
 
 
 
 def encoding(data):
-    catcol = data.select_dtypes(include=['object']).columns.to_list()
+    catcol = data.select_dtypes(include=['object']).columns
+    print(catcol)
     oe = OrdinalEncoder()
-    data[catcol] = pd.DataFrame(oe.fit_transform(data[catcol]),columns=oe.get_feature_names_out())
+    data[catcol] = oe.fit_transform(data[catcol])
+    
     return data[catcol]
 
 
@@ -306,9 +310,10 @@ x_train , y_train = missingByRec(x_train,y_train)
 x_test , y_test = missingByRec(x_test,y_test)
 
 
+
 last_cols = x_train.columns
 x_train,x_test = missingByCol(x_train,x_test,[cat for cat in cat_col if cat in x_train.columns])
-
+print(x_test.columns,x_train.columns)
 x_train = setting_up_dtypes (x_train)
 x_test = setting_up_dtypes (x_test)
 
@@ -318,6 +323,7 @@ dropped_cols.update(list(should_add))
 x_train,x_test = discritizer(x_train,x_test , [cont for cont in cont_col if cont  not in dropped_cols])
 
 
+
 cols_after_selection = feature_selection(x_train,y_train)   
 print(x_test.columns)
 x_train = x_train.drop([cols for cols in x_train.columns if cols not in cols_after_selection],axis = 1)
@@ -325,6 +331,7 @@ x_test = x_test.drop([cols for cols in x_test.columns if cols not in cols_after_
 
 x_train = encoding(x_train)
 x_test = encoding(x_test)
+print(x_train.isna().sum(),x_test.isna().sum())
 x_train.to_csv('train_preprocessed.csv')
 x_test.to_csv('test_preprocessed.csv')
 
